@@ -2,7 +2,7 @@
 title: "System CA on Android Emulator"
 menu:
     howto:
-        weight: 4
+        weight: 5
 ---
 
 # Install System CA Certificate on Android Emulator

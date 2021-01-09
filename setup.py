@@ -73,6 +73,7 @@ setup(
         "certifi>=2019.9.11",  # no semver here - this should always be on the last release!
         "click>=7.0,<8.1",
         "cryptography>=36,<37",
+        "dnslib>=0.9.14,<1",
         "flask>=1.1.1,<2.1",
         "h11>=0.11,<0.13",
         "h2>=4.1,<5",

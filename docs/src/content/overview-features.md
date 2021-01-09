@@ -7,18 +7,30 @@ menu:
 
 # Features
 
-- [Anticache](#anticache)
-- [Blocklist](#blocklist)
-- [Client-side replay](#client-side-replay)
-- [Map Local](#map-local)
-- [Map Remote](#map-remote)
-- [Modify Body](#modify-body)
-- [Modify Headers](#modify-headers)
-- [Proxy Authentication](#proxy-authentication)
-- [Server-side replay](#server-side-replay)
-- [Sticky Auth](#sticky-auth)
-- [Sticky Cookies](#sticky-cookies)
-- [Streaming](#streaming)
+- [Features](#features)
+  - [Anticache](#anticache)
+  - [Blocklist](#blocklist)
+      - [Examples](#examples)
+  - [Client-side replay](#client-side-replay)
+  - [Map Local](#map-local)
+      - [Examples](#examples-1)
+    - [Details](#details)
+  - [Map Remote](#map-remote)
+      - [Examples](#examples-2)
+  - [Modify Body](#modify-body)
+      - [Examples](#examples-3)
+  - [Modify Headers](#modify-headers)
+      - [Examples](#examples-4)
+  - [Proxy Authentication](#proxy-authentication)
+  - [Server-side replay](#server-side-replay)
+    - [Response refreshing](#response-refreshing)
+  - [Sticky auth](#sticky-auth)
+  - [Sticky cookies](#sticky-cookies)
+  - [Streaming](#streaming)
+    - [Customizing Streaming](#customizing-streaming)
+  - [DNS Manipulation](#dns-manipulation)
+    - [Replace replies with predefined responses](#replace-replies-with-predefined-responses)
+    - [Blackhole incoming requests](#blackhole-incoming-requests)
 
 ## Anticache
 
@@ -371,3 +383,99 @@ streamed. Requests/Responses that should be tagged for streaming by setting
 their ``.stream`` attribute to ``True``:
 
 {{< example src="examples/addons/http-stream-simple.py" lang="py" >}}
+
+## DNS Manipulation
+
+Operating systems typically allow the user to configure a custom DNS server (if
+not provided via DHCP network configuration). However, this almost always is
+hard-coded to port `udp/53`, which requires root priviliges to listen to. Since
+mitmproxy usually does not run with these privilegs, you need one of the
+following solutions to redirect DNS traffic into mitmproxy:
+
+mitmproxy by default listens on `udp/8053` for incoming DNS queries.
+
+You can use `ncat` (run it in a second terminal) to locally proxy all packets to
+the right destination:
+```bash
+sudo ncat --udp --keep-open --idle-timeout 5s --listen 127.0.0.1 53 --sh-exec "ncat --udp 127.0.0.1 8053"
+```
+
+Or you can use `iptables` to rewrite the destination port:
+```bash
+sudo iptables -t nat -A PREROUTING -p udp --dport 8053 -j REDIRECT --to-port 53
+```
+
+### Replace replies with predefined responses
+
+*aka* DNS Spoofing / DNS Cache Poisoning / DNS Injection
+
+Replacing allows you to spoof or fake an DNS reply by intercepting a client DNS
+query and responding with your own crafted reply instead. The original query is
+never sent to the upstream DNS server.
+
+This expects a zone-style record definition: `google.com A 1.2.3.4`, meaning
+that every DNS query for `google.com` of type `A` will be replied to with an
+answer of `1.2.3.4` and a short TTL (which is configurable).
+
+Example mitmproxy command:
+```bash
+$ mitmproxy --dns-replace 'google.com A 1.2.3.4'
+```
+
+Example Query: 
+```bash
+$ dig @127.0.0.1 google.com
+```
+
+Response Answer: 
+```
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 google.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 12345
+;; flags: qr aa rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;google.com.                    IN      A
+
+;; ANSWER SECTION:
+google.com.             60      IN      A       1.2.3.4
+
+;; Query time: 3 msec
+;; SERVER: 127.0.0.1#53(127.0.0.1)
+```
+
+### Blackhole incoming requests
+
+Blackhole / Sink Hole DNS queris by replying with an `NXDOMAIN` error. This
+causes the client to "think" that no such domain is known and no IP could be
+found for this query.
+
+This expects simple FQDN / domain names: `google.com`
+
+Example mitmproxy command:
+```bash
+$ mitmproxy --dns-blackhole 'google.com'
+```
+
+Example Query: 
+```bash
+$ dig @127.0.0.1 google.com
+```
+
+Response Answer: 
+```
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 google.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN, id: 12345
+;; flags: qr aa rd ra ad; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;google.com.                    IN      A
+
+;; Query time: 3 msec
+;; SERVER: 127.0.0.1#53(127.0.0.1)
+```
