@@ -1,5 +1,5 @@
 import copy
-import typing
+from collections.abc import Sequence
 import socket
 
 from dnslib import DNSRecord, RR, QTYPE, RCODE, parse_time
@@ -103,11 +103,11 @@ class DNS:
             "TTL for DNS replies.",
         )
         loader.add_option(
-            "dns_replace", typing.Sequence[str], [],
+            "dns_replace", Sequence[str], [],
             "DNS Zone entries to replace. Format: 'example.com A 1.2.3.4'",
         )
         loader.add_option(
-            "dns_blackhole", typing.Sequence[str], [],
+            "dns_blackhole", Sequence[str], [],
             "Names to fail with a NXDOMAIN reply. Format: 'example.com'",
         )
 
