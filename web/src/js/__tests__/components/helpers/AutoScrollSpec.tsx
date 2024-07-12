@@ -1,41 +1,46 @@
 import * as React from "react";
-import ReactDOM from "react-dom"
-import AutoScroll from '../../../components/helpers/AutoScroll'
-import { calcVScroll } from '../../../components/helpers/VirtualScroll'
-import TestUtils from 'react-dom/test-utils'
+import * as autoscroll from "../../../components/helpers/AutoScroll";
+import TestUtils from "react-dom/test-utils";
 
-describe('Autoscroll', () => {
-    let mockFn = jest.fn()
-    class tComponent extends React.Component {
-        constructor(props, context){
-            super(props, context)
-            this.state = { vScroll: calcVScroll() }
+describe("Autoscroll", () => {
+    class TComponent extends React.Component {
+        private viewport = React.createRef<HTMLDivElement>();
+
+        getSnapshotBeforeUpdate() {
+            return autoscroll.isAtBottom(this.viewport);
         }
 
-       UNSAFE_componentWillUpdate() {
-           mockFn("foo")
-       }
+        componentDidUpdate(prevProps, prevState, snapshot) {
+            if (snapshot) {
+                autoscroll.adjustScrollTop(this.viewport);
+            }
+        }
 
-       componentDidUpdate() {
-           mockFn("bar")
-       }
-
-       render() {
-           return (<p>foo</p>)
-       }
+        render() {
+            return <div ref={this.viewport}>foo</div>;
+        }
     }
 
-    it('should update component', () => {
-        let Foo = AutoScroll(tComponent),
-            autoScroll = TestUtils.renderIntoDocument(<Foo></Foo>),
-            viewport = ReactDOM.findDOMNode(autoScroll)
-        viewport.scrollTop = 10
-        Object.defineProperty(viewport, "scrollHeight", { value: 10, writable: true })
-        autoScroll.UNSAFE_componentWillUpdate()
-        expect(mockFn).toBeCalledWith("foo")
+    it("should update component", () => {
+        const autoScroll = TestUtils.renderIntoDocument(
+            <TComponent></TComponent>,
+        );
+        const viewport = autoScroll.viewport.current;
 
-        Object.defineProperty(viewport, "scrollHeight", { value: 0, writable: true })
-        autoScroll.componentDidUpdate()
-        expect(mockFn).toBeCalledWith("bar")
-    })
-})
+        expect(autoScroll.getSnapshotBeforeUpdate()).toBe(false);
+
+        viewport.scrollTop = 10;
+        Object.defineProperty(viewport, "scrollHeight", {
+            value: 10,
+            writable: true,
+        });
+        expect(autoScroll.getSnapshotBeforeUpdate()).toBe(true);
+
+        Object.defineProperty(viewport, "scrollHeight", {
+            value: 42,
+            writable: true,
+        });
+        autoScroll.componentDidUpdate({}, {}, true);
+        expect(viewport.scrollTop).toBe(42);
+    });
+});
